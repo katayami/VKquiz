@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite не поддерживает enum в Prisma — значения фиксируются на уровне кода:
+// Role: "organizer" | "participant"
+// QuizStatus: "draft" | "active" | "finished"
+// QuestionType: "single" | "multiple"
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String
+  createdAt    DateTime @default(now())
+
+  quizzes Quiz[]   @relation("OrganizerQuizzes")
+  answers Answer[]
+  results Result[]
+}
+
+model Quiz {
+  id          Int        @id @default(autoincrement())
+  title       String
+  category    String?
+  rules       String?
+  roomCode    String   @unique
+  status      String   @default("draft")
+  organizerId Int
+  organizer   User     @relation("OrganizerQuizzes", fields: [organizerId], references: [id])
+  createdAt   DateTime @default(now())
+
+  questions Question[]
+  results   Result[]
+}
+
+model Question {
+  id        Int      @id @default(autoincrement())
+  text      String
+  imageUrl  String?
+  type      String
+  timeLimit Int
+  order     Int
+  quizId    Int
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+
+  options Option[]
+  answers Answer[]
+}
+
+model Option {
+  id         Int      @id @default(autoincrement())
+  text       String
+  isCorrect  Boolean  @default(false)
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id])
+
+  answers Answer[] @relation("AnswerOptions")
+}
+
+model Answer {
+  id              Int      @id @default(autoincrement())
+  questionId      Int
+  question        Question @relation(fields: [questionId], references: [id])
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  selectedOptions Option[] @relation("AnswerOptions")
+  isCorrect       Boolean
+  answeredAt      DateTime @default(now())
+
+  @@unique([questionId, userId])
+}
+
+model Result {
+  id      Int  @id @default(autoincrement())
+  quizId  Int
+  quiz    Quiz @relation(fields: [quizId], references: [id])
+  userId  Int
+  user    User @relation(fields: [userId], references: [id])
+  score   Int  @default(0)
+
+  @@unique([quizId, userId])
+}
